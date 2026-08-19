@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "语雀 Markdown 导出器",
-  "version": "1.0.0",
-  "description": "查看、复制和导出当前语雀文档，可选将图片下载到本地 ZIP。",
+  "version": "2.0.0",
+  "description": "查看、复制和导出当前语雀文档或结构化表格，支持 Markdown、CSV 和图片本地化。",
   "permissions": [
     "activeTab",
-    "clipboardWrite"
+    "clipboardWrite",
+    "scripting"
   ],
   "host_permissions": [
     "http://yuque.com/*",
@@ -16,6 +17,24 @@
   "optional_host_permissions": [
     "https://*/*",
     "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/table-capture.js",
+        "lib/table-page.js"
+      ],
+      "matches": [
+        "http://yuque.com/*",
+        "http://*.yuque.com/*",
+        "https://yuque.com/*",
+        "https://*.yuque.com/*"
+      ]
+    }
   ],
   "action": {
     "default_title": "语雀 Markdown 导出器",
