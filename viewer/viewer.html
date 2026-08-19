@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 预览</title>
+    <link rel="stylesheet" href="./viewer.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="logo" aria-hidden="true">M↓</span>
+        <div>
+          <h1 id="preview-title">Markdown 预览</h1>
+          <p>语雀 Markdown 导出器 · 本地生成</p>
+        </div>
+      </header>
+      <p id="preview-status" class="status" role="status" hidden></p>
+      <pre id="preview-content"></pre>
+    </main>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>

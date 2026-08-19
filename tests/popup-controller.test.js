@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 
 import { createPopupController } from '../lib/popup-controller.js';
 
-function markdownResponse(markdown) {
+function markdownResponse(markdown, status = 200) {
   return new Response(markdown, {
+    status,
     headers: { 'content-type': 'text/plain; charset=utf-8' }
   });
 }
@@ -17,11 +18,32 @@ function imageResponse(bytes, contentType = 'image/png') {
 
 function createHarness({
   tab = {
+    id: 42,
     url: 'https://team.yuque.com/org/repo/doc',
     title: '季度需求'
   },
   fetchImpl = async () => markdownResponse('# 需求'),
-  permissionGranted = true
+  permissionGranted = true,
+  inspections = [
+    { structured: false, activeView: null, hasTableView: false }
+  ],
+  capturedTable = {
+    title: '季度需求',
+    sourceUrl: 'https://team.yuque.com/org/repo/doc',
+    viewName: '表格视图',
+    filtersActive: true,
+    columns: [
+      { id: 'subject', name: '事项' },
+      { id: 'status', name: '状态' }
+    ],
+    records: [
+      {
+        key: '1:事项 A',
+        values: { subject: '事项 A', status: '进行中' }
+      }
+    ]
+  },
+  captureError
 } = {}) {
   const state = {
     page: undefined,
@@ -31,7 +53,11 @@ function createHarness({
     opened: [],
     copied: [],
     downloads: [],
-    permissionRequests: []
+    permissionRequests: [],
+    inspectionCalls: [],
+    captureCalls: [],
+    previews: [],
+    captureProgress: []
   };
 
   const view = {
@@ -46,12 +72,33 @@ function createHarness({
     },
     showPermissionStep(origins) {
       state.permission = origins;
+    },
+    showCaptureProgress(message) {
+      state.captureProgress.push(message);
     }
   };
+
+  let inspectionIndex = 0;
 
   const browser = {
     async getActiveTab() {
       return tab;
+    },
+    async inspectStructuredPage(tabId) {
+      state.inspectionCalls.push(tabId);
+      const index = Math.min(inspectionIndex, inspections.length - 1);
+      inspectionIndex += 1;
+      return inspections[index];
+    },
+    async captureStructuredTable(tabId) {
+      state.captureCalls.push(tabId);
+      if (captureError) {
+        throw captureError;
+      }
+      return capturedTable;
+    },
+    async openGeneratedMarkdown(preview) {
+      state.previews.push(preview);
     },
     async openTab(url) {
       state.opened.push(url);
@@ -76,16 +123,161 @@ function createHarness({
 
 test('非语雀文档初始化为不可操作状态', async () => {
   const { controller, state } = createHarness({
-    tab: { url: 'https://example.com/page', title: '普通网页' }
+    tab: { id: 42, url: 'https://example.com/page', title: '普通网页' }
   });
 
   await controller.initialize();
 
   assert.deepEqual(state.page, {
     supported: false,
+    kind: 'unsupported',
     title: '普通网页',
     reason: '当前页面不是语雀页面'
   });
+});
+
+test('初始化时主动识别结构化表格并切换页面类型', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '看板视图',
+        hasTableView: true
+      }
+    ]
+  });
+
+  await controller.initialize();
+
+  assert.deepEqual(state.page, {
+    supported: true,
+    kind: 'table',
+    title: '季度需求',
+    reason: undefined
+  });
+  assert.deepEqual(state.inspectionCalls, [42]);
+});
+
+test('Markdown 返回 404 后重新识别延迟渲染的结构化页面', async () => {
+  const { controller, state } = createHarness({
+    fetchImpl: async () => markdownResponse('Not Found', 404),
+    inspections: [
+      { structured: false, activeView: null, hasTableView: false },
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ]
+  });
+  await controller.initialize();
+
+  await controller.copyMarkdown();
+
+  assert.equal(state.page.kind, 'table');
+  assert.deepEqual(state.inspectionCalls, [42, 42]);
+  assert.equal(state.captureCalls.length, 1);
+  assert.match(state.copied[0], /\| 事项 A \| 进行中 \|/);
+});
+
+test('结构化页面复制 Markdown 并复用当前弹窗内的采集结果', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ]
+  });
+  await controller.initialize();
+
+  await controller.copyMarkdown();
+  await controller.copyMarkdown();
+
+  assert.deepEqual(state.captureCalls, [42]);
+  assert.equal(state.copied.length, 2);
+  assert.equal(state.copied[0], state.copied[1]);
+  assert.match(state.copied[0], /\| 事项 \| 状态 \|/);
+});
+
+test('结构化页面查看由本地生成的 Markdown', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '看板视图',
+        hasTableView: true
+      }
+    ]
+  });
+  await controller.initialize();
+
+  await controller.viewMarkdown();
+
+  assert.equal(state.opened.length, 0);
+  assert.equal(state.previews[0].title, '季度需求');
+  assert.match(state.previews[0].markdown, /^# 季度需求/m);
+});
+
+test('结构化页面下载 Markdown 文件', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ]
+  });
+  await controller.initialize();
+
+  await controller.startExport('markdown');
+
+  assert.equal(state.downloads[0].filename, '季度需求.md');
+  assert.match(await state.downloads[0].blob.text(), /\| 事项 A \| 进行中 \|/);
+});
+
+test('结构化页面下载带 BOM 的 CSV 文件', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ]
+  });
+  await controller.initialize();
+
+  await controller.startExport('csv');
+
+  assert.equal(state.downloads[0].filename, '季度需求.csv');
+  assert.equal(state.downloads[0].blob.type, 'text/csv;charset=utf-8');
+  assert.deepEqual(
+    [...new Uint8Array(await state.downloads[0].blob.arrayBuffer()).slice(0, 3)],
+    [0xef, 0xbb, 0xbf]
+  );
+});
+
+test('结构化页面采集失败时不生成文件', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ],
+    captureError: new Error('未能到达表格底部')
+  });
+  await controller.initialize();
+
+  await controller.startExport('markdown');
+
+  assert.deepEqual(state.downloads, []);
+  assert.equal(state.statuses.at(-1).kind, 'error');
+  assert.match(state.statuses.at(-1).message, /未能到达表格底部/);
 });
 
 test('查看 Markdown 打开规范化后的新标签页', async () => {

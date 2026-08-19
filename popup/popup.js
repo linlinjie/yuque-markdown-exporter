@@ -7,7 +7,8 @@ const elements = {
   viewButton: document.querySelector('#view-button'),
   copyButton: document.querySelector('#copy-button'),
   exportButton: document.querySelector('#export-button'),
-  exportOptions: document.querySelector('#export-options'),
+  documentExportOptions: document.querySelector('#document-export-options'),
+  tableExportOptions: document.querySelector('#table-export-options'),
   permissionPanel: document.querySelector('#permission-panel'),
   permissionOrigins: document.querySelector('#permission-origins'),
   permissionButton: document.querySelector('#permission-button'),
@@ -15,22 +16,35 @@ const elements = {
 };
 
 let pageSupported = false;
+let pageKind = 'unsupported';
 let busy = false;
+let activeTabId;
 
 function updateDisabledState() {
   elements.viewButton.disabled = busy || !pageSupported;
   elements.copyButton.disabled = busy || !pageSupported;
   elements.exportButton.disabled = busy || !pageSupported;
-  elements.exportOptions.disabled = busy || !pageSupported;
+  elements.documentExportOptions.disabled = busy || !pageSupported;
+  elements.tableExportOptions.disabled = busy || !pageSupported;
   elements.permissionButton.disabled = busy;
 }
 
 const view = {
-  renderPage({ supported, title, reason }) {
+  renderPage({ supported, kind, title, reason }) {
     pageSupported = supported;
+    pageKind = kind;
     elements.title.textContent = title;
-    elements.pageState.textContent = supported ? '已识别语雀文档' : reason;
+    elements.pageState.textContent = supported
+      ? kind === 'table'
+        ? '已识别语雀表格/看板'
+        : '已识别语雀文档'
+      : reason;
     elements.pageDot.className = `state-dot ${supported ? 'supported' : 'unsupported'}`;
+    elements.documentExportOptions.hidden = kind !== 'document';
+    elements.tableExportOptions.hidden = kind !== 'table';
+    if (kind === 'table') {
+      elements.permissionPanel.hidden = true;
+    }
     updateDisabledState();
   },
 
@@ -53,13 +67,46 @@ const view = {
       elements.permissionOrigins.append(item);
     }
     elements.permissionPanel.hidden = origins.length === 0;
+  },
+
+  showCaptureProgress(message) {
+    this.showStatus('info', message);
   }
 };
+
+async function installTableBridge(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content/table-bridge.js']
+  });
+}
+
+async function sendTableMessage(tabId, type) {
+  await installTableBridge(tabId);
+  const response = await chrome.tabs.sendMessage(tabId, { type });
+  if (!response?.ok) {
+    const error = new Error(
+      response?.error?.message ?? '无法读取语雀表格页面'
+    );
+    error.code = response?.error?.code;
+    throw error;
+  }
+  return response.value;
+}
 
 const browser = {
   async getActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    activeTabId = tab?.id;
     return tab;
+  },
+
+  inspectStructuredPage(tabId) {
+    return sendTableMessage(tabId, 'YUQUE_TABLE_INSPECT');
+  },
+
+  captureStructuredTable(tabId) {
+    return sendTableMessage(tabId, 'YUQUE_TABLE_CAPTURE');
   },
 
   openTab(url) {
@@ -68,6 +115,19 @@ const browser = {
 
   copyText(text) {
     return navigator.clipboard.writeText(text);
+  },
+
+  async openGeneratedMarkdown({ title, markdown }) {
+    const { token } = await chrome.runtime.sendMessage({
+      type: 'YUQUE_PREVIEW_CREATE',
+      title,
+      text: markdown
+    });
+    await chrome.tabs.create({
+      url: chrome.runtime.getURL(
+        `viewer/viewer.html#${encodeURIComponent(token)}`
+      )
+    });
   },
 
   requestOrigins(origins) {
@@ -87,6 +147,16 @@ const browser = {
   }
 };
 
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (
+    message?.type === 'YUQUE_TABLE_PROGRESS' &&
+    sender.tab?.id === activeTabId
+  ) {
+    view.showCaptureProgress(message.message);
+  }
+  return false;
+});
+
 const controller = createPopupController({
   browser,
   view,
@@ -102,7 +172,9 @@ elements.copyButton.addEventListener('click', () => {
 });
 
 elements.exportButton.addEventListener('click', () => {
-  const mode = document.querySelector('input[name="export-mode"]:checked').value;
+  const radioName =
+    pageKind === 'table' ? 'table-export-mode' : 'export-mode';
+  const mode = document.querySelector(`input[name="${radioName}"]:checked`).value;
   void controller.startExport(mode);
 });
 
@@ -113,6 +185,7 @@ elements.permissionButton.addEventListener('click', () => {
 controller.initialize().catch((error) => {
   view.renderPage({
     supported: false,
+    kind: 'unsupported',
     title: '无法读取当前标签页',
     reason: error instanceof Error ? error.message : String(error)
   });

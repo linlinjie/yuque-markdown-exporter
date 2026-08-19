@@ -35,7 +35,7 @@
 
       <section class="export-card" aria-labelledby="export-title">
         <h2 id="export-title">导出文档</h2>
-        <fieldset id="export-options">
+        <fieldset id="document-export-options">
           <legend class="sr-only">选择图片处理方式</legend>
           <label class="option">
             <input type="radio" name="export-mode" value="remote" checked>
@@ -49,6 +49,23 @@
             <span>
               <strong>下载图片到本地</strong>
               <small>导出 Markdown 和 images 的 ZIP</small>
+            </span>
+          </label>
+        </fieldset>
+        <fieldset id="table-export-options" hidden>
+          <legend class="sr-only">选择表格导出格式</legend>
+          <label class="option">
+            <input type="radio" name="table-export-mode" value="markdown" checked>
+            <span>
+              <strong>Markdown 表格</strong>
+              <small>适合交给 Agent 阅读和分析</small>
+            </span>
+          </label>
+          <label class="option">
+            <input type="radio" name="table-export-mode" value="csv">
+            <span>
+              <strong>CSV 表格</strong>
+              <small>适合 Excel 和数据处理工具</small>
             </span>
           </label>
         </fieldset>
