@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语雀 Markdown 导出器</title>
+    <link rel="stylesheet" href="./popup.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div class="logo" aria-hidden="true">M↓</div>
+        <div>
+          <h1>语雀 Markdown 导出器</h1>
+          <p>单篇文档 · 本地处理</p>
+        </div>
+      </header>
+
+      <section class="document-card" aria-labelledby="document-title">
+        <div class="document-state">
+          <span id="page-dot" class="state-dot" aria-hidden="true"></span>
+          <span id="page-state">正在识别当前页面…</span>
+        </div>
+        <h2 id="document-title">读取中</h2>
+      </section>
+
+      <section class="quick-actions" aria-label="Markdown 快捷操作">
+        <button id="view-button" class="button button-secondary" type="button">
+          查看 Markdown
+        </button>
+        <button id="copy-button" class="button button-secondary" type="button">
+          复制 Markdown
+        </button>
+      </section>
+
+      <section class="export-card" aria-labelledby="export-title">
+        <h2 id="export-title">导出文档</h2>
+        <fieldset id="export-options">
+          <legend class="sr-only">选择图片处理方式</legend>
+          <label class="option">
+            <input type="radio" name="export-mode" value="remote" checked>
+            <span>
+              <strong>保持图片原地址</strong>
+              <small>导出单个 Markdown 文件</small>
+            </span>
+          </label>
+          <label class="option">
+            <input type="radio" name="export-mode" value="local">
+            <span>
+              <strong>下载图片到本地</strong>
+              <small>导出 Markdown 和 images 的 ZIP</small>
+            </span>
+          </label>
+        </fieldset>
+        <button id="export-button" class="button button-primary" type="button">
+          导出
+        </button>
+      </section>
+
+      <section id="permission-panel" class="permission-panel" hidden>
+        <h2>需要读取图片域名</h2>
+        <p>仅为本次图片本地化申请以下域名权限：</p>
+        <ul id="permission-origins"></ul>
+        <button id="permission-button" class="button button-primary" type="button">
+          授权并导出
+        </button>
+      </section>
+
+      <p id="status" class="status info" role="status" aria-live="polite" hidden></p>
+
+      <footer>内容不会上传到任何第三方服务</footer>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

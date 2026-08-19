@@ -1,0 +1,271 @@
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  color: #1f2937;
+  background: #f5f7f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  background:
+    radial-gradient(circle at 100% 0, rgba(37, 184, 100, 0.12), transparent 42%),
+    #f5f7f6;
+}
+
+.app {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header h1,
+.header p,
+.document-card h2,
+.export-card h2,
+.permission-panel h2,
+.permission-panel p,
+.status,
+footer {
+  margin: 0;
+}
+
+.header h1 {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.header p {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.logo {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(145deg, #25b864, #15944c);
+  box-shadow: 0 6px 16px rgba(21, 148, 76, 0.22);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.document-card,
+.export-card,
+.permission-panel {
+  border: 1px solid #e3e9e5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 5px 16px rgba(31, 41, 55, 0.05);
+}
+
+.document-card {
+  padding: 13px 14px;
+}
+
+.document-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.state-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.13);
+}
+
+.state-dot.supported {
+  background: #25b864;
+  box-shadow: 0 0 0 3px rgba(37, 184, 100, 0.13);
+}
+
+.state-dot.unsupported {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.document-card h2 {
+  margin-top: 7px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.button {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(37, 184, 100, 0.55);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.button-secondary {
+  border-color: #d8e1dc;
+  color: #31523e;
+  background: #fff;
+}
+
+.button-primary {
+  width: 100%;
+  color: #fff;
+  background: #20a85a;
+}
+
+.export-card,
+.permission-panel {
+  padding: 14px;
+}
+
+.export-card h2,
+.permission-panel h2 {
+  font-size: 14px;
+}
+
+fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  border: 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.option:has(input:checked) {
+  border-color: #74cf99;
+  background: #f2fbf6;
+}
+
+.option input {
+  margin: 3px 0 0;
+  accent-color: #20a85a;
+}
+
+.option span {
+  display: grid;
+  gap: 2px;
+}
+
+.option strong {
+  font-size: 13px;
+}
+
+.option small,
+.permission-panel p,
+.permission-panel li {
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.permission-panel p {
+  margin-top: 5px;
+}
+
+.permission-panel ul {
+  max-height: 88px;
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  overflow: auto;
+}
+
+.permission-panel li {
+  overflow-wrap: anywhere;
+}
+
+.status {
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.status.info {
+  color: #36536f;
+  background: #eaf4ff;
+}
+
+.status.success {
+  color: #17643b;
+  background: #e8f8ef;
+}
+
+.status.warning {
+  color: #7c5208;
+  background: #fff6d9;
+}
+
+.status.error {
+  color: #9f2525;
+  background: #feeeee;
+}
+
+footer {
+  color: #84908a;
+  font-size: 10px;
+  text-align: center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

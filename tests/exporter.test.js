@@ -52,6 +52,18 @@ test('HTML 响应被识别为登录态失效', async () => {
   );
 });
 
+test('重定向到登录地址时即使响应类型异常也要求重新登录', async () => {
+  const redirected = response('redirected');
+  Object.defineProperty(redirected, 'url', {
+    value: 'https://team.yuque.com/login?redirect=%2Fdoc'
+  });
+
+  await assert.rejects(
+    fetchMarkdownText(async () => redirected, 'https://team.yuque.com/doc'),
+    (error) => error instanceof ExportError && error.code === 'AUTH_REQUIRED'
+  );
+});
+
 test('空白 Markdown 返回空内容错误', async () => {
   await assert.rejects(
     fetchMarkdownText(async () => response('  \n'), 'https://team.yuque.com/doc'),
