@@ -39,6 +39,19 @@ test('HTTP 非成功响应返回稳定错误码', async () => {
   );
 });
 
+test('HTTP 错误保留状态码供结构化页面回退判断', async () => {
+  await assert.rejects(
+    fetchMarkdownText(
+      async () => response('Not Found', { status: 404 }),
+      'https://team.yuque.com/a/b/c/markdown'
+    ),
+    (error) =>
+      error instanceof ExportError &&
+      error.code === 'HTTP_ERROR' &&
+      error.status === 404
+  );
+});
+
 test('HTML 响应被识别为登录态失效', async () => {
   await assert.rejects(
     fetchMarkdownText(
