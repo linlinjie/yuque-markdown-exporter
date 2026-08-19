@@ -22,6 +22,10 @@ test('Windows 保留名称添加安全前缀', () => {
 
 test('文件名按 Unicode 字符限制为 120 个字符', () => {
   assert.equal(Array.from(sanitizeFilename('文'.repeat(130))).length, 120);
+  assert.equal(
+    Array.from(sanitizeFilename(`CON.${'文'.repeat(116)}`)).length,
+    120
+  );
 });
 
 test('Content-Type 优先决定图片扩展名', () => {

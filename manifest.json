@@ -8,6 +8,8 @@
     "clipboardWrite"
   ],
   "host_permissions": [
+    "http://yuque.com/*",
+    "http://*.yuque.com/*",
     "https://yuque.com/*",
     "https://*.yuque.com/*"
   ],

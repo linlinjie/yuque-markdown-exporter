@@ -38,7 +38,7 @@ ZIP 中包含 `<文档标题>.md` 和 `images/`。同一个远程图片只下载
 
 - `activeTab`：只在点击扩展时读取当前标签页地址和标题。
 - `clipboardWrite`：执行“复制 Markdown”。
-- `https://yuque.com/*`、`https://*.yuque.com/*`：使用当前语雀登录态读取 Markdown。
+- 语雀 `http(s)://yuque.com/*` 及其子域名：使用当前语雀登录态读取 Markdown。
 - 可选的 HTTP(S) 图片域名权限：仅在选择“下载图片到本地”后，根据文档实际引用的域名申请。拒绝不会影响保持原地址的 `.md` 导出。
 
 扩展不会上传、同步或持久化文档内容，不会向语雀页面注入脚本，也不会修改原文。

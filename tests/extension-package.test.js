@@ -17,6 +17,8 @@ test('Manifest 声明最小固定权限和按需图片权限', async () => {
   assert.equal(manifest.action.default_popup, 'popup/popup.html');
   assert.deepEqual([...manifest.permissions].sort(), ['activeTab', 'clipboardWrite']);
   assert.deepEqual([...manifest.host_permissions].sort(), [
+    'http://*.yuque.com/*',
+    'http://yuque.com/*',
     'https://*.yuque.com/*',
     'https://yuque.com/*'
   ]);
