@@ -63,19 +63,32 @@ function fakeCell(text, options = {}) {
   };
 }
 
-function fakeButton(children) {
+function fakeButton(children, { tagName = 'BUTTON', role = null } = {}) {
   return {
+    tagName,
     children,
     innerText: children.map((child) => child.innerText).join(' '),
-    textContent: children.map((child) => child.textContent).join(' ')
+    textContent: children.map((child) => child.textContent).join(' '),
+    getAttribute(name) {
+      return name === 'role' ? role : null;
+    }
   };
 }
 
 function fakeRow(buttons) {
   return {
     querySelectorAll(selector) {
-      assert.equal(selector, 'button');
-      return buttons;
+      if (selector === 'button') {
+        return buttons.filter((button) => button.tagName === 'BUTTON');
+      }
+      if (selector === 'button, [role="button"]') {
+        return buttons.filter(
+          (button) =>
+            button.tagName === 'BUTTON' ||
+            button.getAttribute('role') === 'button'
+        );
+      }
+      assert.fail(`unexpected row selector: ${selector}`);
     }
   };
 }
@@ -256,6 +269,20 @@ test('从表头按钮生成稳定且去重的字段 ID', () => {
   ]);
 });
 
+test('从 role=button 的自定义表头控件提取字段', () => {
+  const table = fakeTable([
+    fakeRow([
+      fakeButton([fakeCell('事项')], { tagName: 'DIV', role: 'button' }),
+      fakeButton([fakeCell('状态')], { tagName: 'DIV', role: 'button' })
+    ])
+  ]);
+
+  assert.deepEqual(extractTableColumns(table), [
+    { id: 'column-0', name: '事项' },
+    { id: 'column-1', name: '状态' }
+  ]);
+});
+
 test('只从含数字索引的记录按钮提取当前渲染行', () => {
   const header = fakeRow([
     fakeButton([fakeCell('事项')]),
@@ -266,6 +293,30 @@ test('只从含数字索引的记录按钮提取当前渲染行', () => {
     fakeButton([fakeCell('7'), fakeCell('事项 A'), fakeCell('进行中')])
   ]);
   const table = fakeTable([header, group, data]);
+  const columns = [
+    { id: 'column-0', name: '事项' },
+    { id: 'column-1', name: '状态' }
+  ];
+
+  assert.deepEqual(extractRenderedRecords(table, columns), [
+    {
+      key: '7:事项 A',
+      values: {
+        'column-0': '事项 A',
+        'column-1': '进行中'
+      }
+    }
+  ]);
+});
+
+test('从 role=button 的自定义记录控件提取单元格', () => {
+  const data = fakeRow([
+    fakeButton(
+      [fakeCell('7'), fakeCell('事项 A'), fakeCell('进行中')],
+      { tagName: 'DIV', role: 'button' }
+    )
+  ]);
+  const table = fakeTable([data]);
   const columns = [
     { id: 'column-0', name: '事项' },
     { id: 'column-1', name: '状态' }
