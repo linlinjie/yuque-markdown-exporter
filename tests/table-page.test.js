@@ -75,8 +75,9 @@ function fakeButton(children, { tagName = 'BUTTON', role = null } = {}) {
   };
 }
 
-function fakeRow(buttons) {
+function fakeRow(buttons, children = []) {
   return {
+    children,
     querySelectorAll(selector) {
       if (selector === 'button') {
         return buttons.filter((button) => button.tagName === 'BUTTON');
@@ -315,6 +316,30 @@ test('从 role=button 的自定义记录控件提取单元格', () => {
       [fakeCell('7'), fakeCell('事项 A'), fakeCell('进行中')],
       { tagName: 'DIV', role: 'button' }
     )
+  ]);
+  const table = fakeTable([data]);
+  const columns = [
+    { id: 'column-0', name: '事项' },
+    { id: 'column-1', name: '状态' }
+  ];
+
+  assert.deepEqual(extractRenderedRecords(table, columns), [
+    {
+      key: '7:事项 A',
+      values: {
+        'column-0': '事项 A',
+        'column-1': '进行中'
+      }
+    }
+  ]);
+});
+
+test('从带前置选择列和行号的标准表格行提取单元格', () => {
+  const data = fakeRow([], [
+    fakeCell(''),
+    fakeCell('7'),
+    fakeCell('事项 A'),
+    fakeCell('进行中')
   ]);
   const table = fakeTable([data]);
   const columns = [
