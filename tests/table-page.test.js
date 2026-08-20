@@ -413,3 +413,27 @@ test('表头为空时拒绝返回不可验证的数据', async () => {
     (error) => error.code === 'EMPTY_COLUMNS'
   );
 });
+
+test('没有记录时在本地错误中附带匿名 DOM 诊断', async () => {
+  const table = fakeTable([
+    fakeRow([
+      fakeButton([fakeCell('事项')]),
+      fakeButton([fakeCell('状态')])
+    ]),
+    fakeRow([], [fakeCell(''), fakeCell('未知结构')])
+  ]);
+  const doc = fakeCaptureDocument(table);
+
+  await assert.rejects(
+    captureStructuredTable({
+      doc,
+      locationHref: doc.location.href,
+      sleep: async () => {},
+      now: () => 0
+    }),
+    (error) =>
+      error.code === 'NO_RECORDS' &&
+      error.message.includes('诊断：') &&
+      error.message.includes('rows=2')
+  );
+});
