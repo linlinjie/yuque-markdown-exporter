@@ -104,6 +104,75 @@ test('把压缩 Lakesheet 网格转成记录', async () => {
   });
 });
 
+test('语雀 Excel 网格解析下拉、链接和公式显示值', async () => {
+  const sheet = {
+    name: '用工',
+    data: {
+      0: {
+        0: {
+          s: 0,
+          v: {
+            class: 'select',
+            options: [{ value: '业务板块' }],
+            value: ['业务板块']
+          }
+        },
+        1: { v: '工程arch链接' }
+      },
+      1: {
+        0: { v: '员工服务' },
+        1: {
+          s: 3,
+          t: 0,
+          v: {
+            class: 'link',
+            text: 'zhonghe-kylin',
+            url: 'https://arch.shebao.net/#/pm/project-home/project-info/zhonghe-kylin'
+          }
+        }
+      },
+      2: {
+        0: {
+          v: {
+            class: 'formula',
+            formula: 'SUM(D5:D8)',
+            value: 10,
+            error: false
+          }
+        },
+        1: { v: '' }
+      }
+    }
+  };
+  const table = await convertStructuredDoc(
+    {
+      type: 'Sheet',
+      format: 'lakesheet',
+      title: '系统清单',
+      body: JSON.stringify({
+        format: 'lakesheet',
+        version: '3.5.5',
+        larkJson: true,
+        sheet: compressJson(sheet)
+      })
+    },
+    { ...source, inflate, title: '系统清单' }
+  );
+
+  assert.deepEqual(table.columns.map(({ name }) => name), [
+    '业务板块',
+    '工程arch链接'
+  ]);
+  assert.deepEqual(table.records[0].values, {
+    'column-0': '员工服务',
+    'column-1': {
+      text: 'zhonghe-kylin',
+      href: 'https://arch.shebao.net/#/pm/project-home/project-info/zhonghe-kylin'
+    }
+  });
+  assert.equal(table.records[1].values['column-0'], 10);
+});
+
 test('把数据表 columns/records 转成记录并解析选项', async () => {
   const table = await convertStructuredDoc(
     {

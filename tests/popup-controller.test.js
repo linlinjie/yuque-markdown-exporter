@@ -411,6 +411,7 @@ test('表格文档没有接口数据且 DOM 采集失败时给出明确错误', 
   await controller.startExport('markdown');
 
   assert.deepEqual(state.downloads, []);
+  assert.deepEqual(state.captureCalls, []);
   assert.equal(state.statuses.at(-1).kind, 'error');
   assert.match(state.statuses.at(-1).message, /无法读取语雀表格数据/);
 });

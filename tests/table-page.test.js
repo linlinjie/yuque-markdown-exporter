@@ -441,6 +441,55 @@ test('从当前页面接口读取表格文档内容', async () => {
   assert.match(payload.body_sheet, /事项/);
 });
 
+test('隔离世界也能从页面脚本读取 book_id 拉取表格', async () => {
+  const encoded = encodeURIComponent(
+    JSON.stringify({
+      book: { id: 36854900 },
+      doc: {
+        type: 'Sheet',
+        format: 'lakesheet',
+        slug: 'rs95wz5y2t1kq5ah',
+        title: '系统清单'
+      }
+    })
+  );
+  const calls = [];
+  const doc = {
+    defaultView: {},
+    scripts: [
+      {
+        textContent: `(function() { window.appData = JSON.parse(decodeURIComponent("${encoded}")); })();`
+      }
+    ],
+    location: {
+      href: 'https://zhyk.yuque.com/oa6mm8/wfn0hl/rs95wz5y2t1kq5ah#omD2'
+    }
+  };
+
+  const payload = await fetchPageDocument({
+    doc,
+    locationHref: doc.location.href,
+    fetchImpl: async (url) => {
+      calls.push(url);
+      return new Response(
+        JSON.stringify({
+          data: {
+            type: 'Sheet',
+            format: 'lakesheet',
+            title: '系统清单',
+            body: '{"format":"lakesheet","sheet":"x"}'
+          }
+        }),
+        { headers: { 'content-type': 'application/json' } }
+      );
+    }
+  });
+
+  assert.match(calls[0], /\/api\/docs\/rs95wz5y2t1kq5ah\?book_id=36854900/);
+  assert.equal(payload.type, 'Sheet');
+  assert.equal(payload.format, 'lakesheet');
+});
+
 test('没有稳定行号的分组和统计行不会被当作记录', () => {
   assert.equal(
     normalizeRenderedRow(
