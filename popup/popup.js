@@ -12,7 +12,10 @@ const elements = {
   permissionPanel: document.querySelector('#permission-panel'),
   permissionOrigins: document.querySelector('#permission-origins'),
   permissionButton: document.querySelector('#permission-button'),
-  status: document.querySelector('#status')
+  status: document.querySelector('#status'),
+  diagnosticPanel: document.querySelector('#diagnostic-panel'),
+  diagnosticText: document.querySelector('#diagnostic-text'),
+  diagnosticCopy: document.querySelector('#diagnostic-copy')
 };
 
 let pageSupported = false;
@@ -53,10 +56,14 @@ const view = {
     updateDisabledState();
   },
 
-  showStatus(kind, message) {
+  showStatus(kind, message, details = {}) {
     elements.status.hidden = false;
     elements.status.className = `status ${kind}`;
     elements.status.textContent = message;
+    const diagnostic = details?.diagnostic ?? '';
+    elements.diagnosticText.textContent = diagnostic;
+    elements.diagnosticPanel.hidden = diagnostic.length === 0;
+    elements.diagnosticCopy.textContent = '复制诊断信息';
   },
 
   showPermissionStep(origins) {
@@ -89,6 +96,7 @@ async function sendTableMessage(tabId, type) {
       response?.error?.message ?? '无法读取语雀表格页面'
     );
     error.code = response?.error?.code;
+    error.details = response?.error?.details;
     throw error;
   }
   return response.value;
@@ -161,6 +169,11 @@ const controller = createPopupController({
   browser,
   view,
   fetchImpl: globalThis.fetch.bind(globalThis)
+});
+
+elements.diagnosticCopy.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(elements.diagnosticText.textContent);
+  elements.diagnosticCopy.textContent = '已复制';
 });
 
 elements.viewButton.addEventListener('click', () => {

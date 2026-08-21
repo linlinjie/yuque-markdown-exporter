@@ -16,6 +16,8 @@
 
 body {
   width: 360px;
+  min-width: 0;
+  max-width: 360px;
   margin: 0;
   background:
     radial-gradient(circle at 100% 0, rgba(37, 184, 100, 0.12), transparent 42%),
@@ -25,6 +27,7 @@ body {
 .app {
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 16px;
 }
 
@@ -234,9 +237,14 @@ fieldset {
 
 .status {
   border-radius: 9px;
+  min-width: 0;
+  max-width: 360px;
   padding: 9px 10px;
   font-size: 12px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .status.info {
@@ -257,6 +265,28 @@ fieldset {
 .status.error {
   color: #9f2525;
   background: #feeeee;
+}
+
+.diagnostic {
+  min-width: 0;
+  max-width: 360px;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #6b7280;
+  background: #f3f5f4;
+  font-size: 11px;
+}
+
+.diagnostic pre {
+  min-width: 0;
+  max-width: 360px;
+  max-height: 180px;
+  margin: 8px 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 footer {

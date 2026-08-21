@@ -85,6 +85,14 @@
 
       <p id="status" class="status info" role="status" aria-live="polite" hidden></p>
 
+      <details id="diagnostic-panel" class="diagnostic" hidden>
+        <summary>诊断信息</summary>
+        <pre id="diagnostic-text"></pre>
+        <button id="diagnostic-copy" class="button button-secondary" type="button">
+          复制诊断信息
+        </button>
+      </details>
+
       <footer>内容不会上传到任何第三方服务</footer>
     </main>
     <script type="module" src="./popup.js"></script>

@@ -67,8 +67,10 @@ function createHarness({
     setBusy(value) {
       state.busy.push(value);
     },
-    showStatus(kind, message) {
-      state.statuses.push({ kind, message });
+    showStatus(kind, message, details) {
+      state.statuses.push(
+        details === undefined ? { kind, message } : { kind, message, details }
+      );
     },
     showPermissionStep(origins) {
       state.permission = origins;
@@ -278,6 +280,30 @@ test('结构化页面采集失败时不生成文件', async () => {
   assert.deepEqual(state.downloads, []);
   assert.equal(state.statuses.at(-1).kind, 'error');
   assert.match(state.statuses.at(-1).message, /未能到达表格底部/);
+});
+
+test('结构化采集错误把匿名诊断与短提示分开传给视图', async () => {
+  const captureError = new Error('未读取到可导出的表格记录');
+  captureError.details = { diagnostic: 'tables=2' };
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        activeView: '表格视图',
+        hasTableView: true
+      }
+    ],
+    captureError
+  });
+
+  await controller.initialize();
+  await controller.startExport('csv');
+
+  assert.deepEqual(state.statuses.at(-1), {
+    kind: 'error',
+    message: '未读取到可导出的表格记录',
+    details: { diagnostic: 'tables=2' }
+  });
 });
 
 test('查看 Markdown 打开规范化后的新标签页', async () => {

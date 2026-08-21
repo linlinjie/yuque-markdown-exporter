@@ -36,7 +36,8 @@
           ok: false,
           error: {
             code: error?.code ?? 'TABLE_CAPTURE_FAILED',
-            message: error instanceof Error ? error.message : String(error)
+            message: error instanceof Error ? error.message : String(error),
+            details: error?.details ?? {}
           }
         });
       }

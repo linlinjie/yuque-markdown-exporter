@@ -141,6 +141,9 @@ function fakeCaptureDocument(table, initialView = '表格视图') {
       if (selector === '[role="tab"]') {
         return tabs;
       }
+      if (selector === 'table') {
+        return [table];
+      }
       if (selector === 'button') {
         return [{ innerText: '1个筛选', textContent: '1个筛选' }];
       }
@@ -414,7 +417,7 @@ test('表头为空时拒绝返回不可验证的数据', async () => {
   );
 });
 
-test('没有记录时在本地错误中附带匿名 DOM 诊断', async () => {
+test('无记录时错误正文简短且诊断独立传递', async () => {
   const table = fakeTable([
     fakeRow([
       fakeButton([fakeCell('事项')]),
@@ -433,7 +436,8 @@ test('没有记录时在本地错误中附带匿名 DOM 诊断', async () => {
     }),
     (error) =>
       error.code === 'NO_RECORDS' &&
-      error.message.includes('诊断：') &&
-      error.message.includes('rows=2')
+      error.message === '未读取到可导出的表格记录' &&
+      typeof error.details?.diagnostic === 'string' &&
+      error.details.diagnostic.includes('rows=2')
   );
 });
