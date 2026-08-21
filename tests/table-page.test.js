@@ -9,7 +9,8 @@ import {
   extractRenderedRecords,
   extractTableColumns,
   inspectStructuredPage,
-  normalizeRenderedRow
+  normalizeRenderedRow,
+  sampleLayoutRecords
 } from '../lib/table-page.js';
 
 function fakeTab(textContent, selected = false) {
@@ -134,12 +135,18 @@ function fakeLayoutCell(text, rect, { role = 'cell' } = {}) {
   };
 }
 
-function fakeLayoutRow(top, cells, { header = false } = {}) {
+function fakeLayoutRow(top, cells, { header = false, rowIndex } = {}) {
   const row = {
     tagName: 'TR',
     children: cells,
     getAttribute(name) {
-      return name === 'role' ? 'row' : null;
+      if (name === 'role') {
+        return 'row';
+      }
+      if (name === 'aria-rowindex' && rowIndex !== undefined) {
+        return String(rowIndex);
+      }
+      return null;
     },
     getBoundingClientRect() {
       const rects = cells.map((cell) => cell.getBoundingClientRect());
@@ -189,6 +196,23 @@ function fakeGridDocument(panes) {
   };
 }
 
+function fakeRecordSource(text, left, top, rowIndex) {
+  const cell = fakeLayoutCell(text, [left, top, 120]);
+  return {
+    left,
+    top,
+    bottom: top + 20,
+    source: {
+      getAttribute(name) {
+        return name === 'aria-rowindex' && rowIndex !== undefined
+          ? String(rowIndex)
+          : null;
+      }
+    },
+    cells: [cell]
+  };
+}
+
 function fakeCaptureDocument(table, initialView = '表格视图') {
   let activeView = initialView;
   const clicks = [];
@@ -233,6 +257,55 @@ function fakeCaptureDocument(table, initialView = '表格视图') {
       }
       if (selector === 'button') {
         return [{ innerText: '1个筛选', textContent: '1个筛选' }];
+      }
+      return [];
+    }
+  };
+}
+
+function fakeMultiPaneCaptureDocument(panes, initialView = '看板视图') {
+  let activeView = initialView;
+  const clicks = [];
+  const tabs = ['看板视图', '表格视图'].map((label) => ({
+    textContent: label,
+    getAttribute(name) {
+      return name === 'aria-selected' && activeView === label ? 'true' : null;
+    },
+    matches(selector) {
+      return selector === '[aria-selected="true"]' && activeView === label;
+    },
+    click() {
+      activeView = label;
+      clicks.push(label);
+    }
+  }));
+
+  return {
+    title: '早会看板',
+    location: { href: 'https://team.yuque.com/a/b/c#view:board' },
+    defaultView: {
+      innerWidth: 1200,
+      innerHeight: 900,
+      getComputedStyle() {
+        return { overflowY: 'visible' };
+      },
+      requestAnimationFrame(callback) {
+        callback();
+      }
+    },
+    clicks,
+    get activeView() {
+      return activeView;
+    },
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return tabs;
+      }
+      if (selector === 'table, [role="grid"]' || selector === 'table') {
+        return panes;
+      }
+      if (selector === 'button') {
+        return [];
       }
       return [];
     }
@@ -490,6 +563,76 @@ test('从看板临时切到表格采集并恢复原视图', async () => {
   assert.ok(progress.some((message) => message.includes('1 条')));
 });
 
+test('结构化采集使用多窗格布局并恢复原视图', async () => {
+  const panes = [
+    fakePane({
+      left: 0,
+      top: 0,
+      width: 280,
+      rows: [
+        fakeLayoutRow(0, [
+          fakeLayoutCell('事项', [0, 0, 280], { role: 'columnheader' })
+        ], { header: true }),
+        fakeLayoutRow(10, [fakeLayoutCell('事项 A', [0, 10, 280])], {
+          rowIndex: 0
+        })
+      ]
+    }),
+    fakePane({
+      left: 280,
+      top: 0,
+      width: 140,
+      rows: [
+        fakeLayoutRow(0, [
+          fakeLayoutCell('状态', [280, 0, 140], { role: 'columnheader' })
+        ], { header: true }),
+        fakeLayoutRow(11, [fakeLayoutCell('进行中', [280, 11, 140])], {
+          rowIndex: 0
+        })
+      ]
+    }),
+    fakePane({
+      left: 420,
+      top: 0,
+      width: 180,
+      rows: [
+        fakeLayoutRow(0, [
+          fakeLayoutCell('负责人', [420, 0, 180], { role: 'columnheader' })
+        ], { header: true }),
+        fakeLayoutRow(9, [fakeLayoutCell('李晓萌', [420, 9, 180])], {
+          rowIndex: 0
+        })
+      ]
+    })
+  ];
+  const doc = fakeMultiPaneCaptureDocument(panes);
+
+  const result = await captureStructuredTable({
+    doc,
+    locationHref: doc.location.href,
+    sleep: async () => {},
+    now: () => 0
+  });
+
+  assert.deepEqual(result.columns.map(({ name }) => name), [
+    '事项',
+    '状态',
+    '负责人'
+  ]);
+  assert.deepEqual(result.records, [
+    {
+      key: 'row-0',
+      values: {
+        'column-0': '事项 A',
+        'column-1': '进行中',
+        'column-2': '李晓萌'
+      }
+    }
+  ]);
+  assert.deepEqual(doc.clicks, ['表格视图', '看板视图']);
+  assert.equal(doc.activeView, '看板视图');
+});
+
 test('表头为空时拒绝返回不可验证的数据', async () => {
   const doc = fakeCaptureDocument(fakeTable([]));
 
@@ -623,5 +766,138 @@ test('按字段横向区间选择行带中的单元格', () => {
   assert.equal(
     cellValueForColumn(rowBand, { left: 300, right: 580 }),
     cell
+  );
+});
+
+test('固定列和独立字段窗格按视觉行合并完整记录', () => {
+  const layout = discoverTableLayout(
+    fakeGridDocument([
+      fakePane({
+        left: 0,
+        top: 0,
+        width: 280,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('事项', [0, 0, 280], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(10, [fakeLayoutCell('事项 A', [0, 10, 280])], {
+            rowIndex: 0
+          })
+        ]
+      }),
+      fakePane({
+        left: 280,
+        top: 0,
+        width: 140,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('状态', [280, 0, 140], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(11, [fakeLayoutCell('进行中', [280, 11, 140])], {
+            rowIndex: 0
+          })
+        ]
+      }),
+      fakePane({
+        left: 420,
+        top: 0,
+        width: 180,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('负责人', [420, 0, 180], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(9, [fakeLayoutCell('李晓萌', [420, 9, 180])], {
+            rowIndex: 0
+          })
+        ]
+      })
+    ])
+  );
+
+  assert.deepEqual(sampleLayoutRecords(layout, layout.columns), [
+    {
+      key: 'row-0',
+      values: {
+        'column-0': '事项 A',
+        'column-1': '进行中',
+        'column-2': '李晓萌'
+      }
+    }
+  ]);
+});
+
+test('空字段保留为空字符串而不左移后续字段', () => {
+  const layout = {
+    diagnostic: 'tables=2',
+    rows: [
+      {
+        top: 10,
+        bottom: 30,
+        sources: [
+          fakeRecordSource('事项 A', 0, 10, 0),
+          fakeRecordSource('', 120, 11, 0)
+        ]
+      }
+    ]
+  };
+  const columns = [
+    { id: 'column-0', name: '事项', left: 0, right: 120 },
+    { id: 'column-1', name: '状态', left: 120, right: 240 }
+  ];
+
+  assert.deepEqual(sampleLayoutRecords(layout, columns), [
+    {
+      key: 'row-0',
+      values: { 'column-0': '事项 A', 'column-1': '' }
+    }
+  ]);
+});
+
+test('重复主字段有稳定行号时保留为两条记录', () => {
+  const layout = {
+    diagnostic: 'tables=1',
+    rows: [
+      {
+        top: 10,
+        bottom: 30,
+        sources: [fakeRecordSource('同名事项', 0, 10, 1)]
+      },
+      {
+        top: 40,
+        bottom: 60,
+        sources: [fakeRecordSource('同名事项', 0, 40, 2)]
+      }
+    ]
+  };
+  const columns = [{ id: 'column-0', name: '事项', left: 0, right: 120 }];
+
+  assert.deepEqual(
+    sampleLayoutRecords(layout, columns).map(({ key }) => key),
+    ['row-1', 'row-2']
+  );
+});
+
+test('重复主字段没有稳定标识时安全失败', () => {
+  const layout = {
+    diagnostic: 'tables=1',
+    rows: [
+      {
+        top: 10,
+        bottom: 30,
+        sources: [fakeRecordSource('同名事项', 0, 10)]
+      },
+      {
+        top: 40,
+        bottom: 60,
+        sources: [fakeRecordSource('同名事项', 0, 40)]
+      }
+    ]
+  };
+
+  assert.throws(
+    () => sampleLayoutRecords(layout, [
+      { id: 'column-0', name: '事项', left: 0, right: 120 }
+    ]),
+    (error) => error.code === 'UNSTABLE_RECORD_ID'
   );
 });

@@ -56,6 +56,27 @@ test('同一记录字段冲突时标记冲突且不静默覆盖', () => {
   );
 });
 
+test('同一记录跨窗格补齐空字段不算冲突', () => {
+  const state = createCaptureState([
+    { id: 'a', name: '事项' },
+    { id: 'b', name: '状态' }
+  ]);
+  mergeRecordBatch(state, [
+    { key: 'row-1', values: { a: 'A', b: '' } }
+  ]);
+
+  assert.deepEqual(
+    mergeRecordBatch(state, [
+      { key: 'row-1', values: { a: '', b: 'B' } }
+    ]),
+    { added: 0, conflicts: 0 }
+  );
+  assert.deepEqual(state.recordsByKey.get('row-1').values, {
+    a: 'A',
+    b: 'B'
+  });
+});
+
 test('只有到达底部且连续三轮稳定时才允许结束', () => {
   assert.equal(
     captureCanFinish({ atBottom: false, stablePasses: 3, conflicts: 0 }),
