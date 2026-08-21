@@ -263,7 +263,11 @@ function fakeCaptureDocument(table, initialView = '表格视图') {
   };
 }
 
-function fakeMultiPaneCaptureDocument(panes, initialView = '看板视图') {
+function fakeMultiPaneCaptureDocument(
+  panes,
+  initialView = '看板视图',
+  getComputedStyle = () => ({ overflowY: 'visible', overflowX: 'visible' })
+) {
   let activeView = initialView;
   const clicks = [];
   const tabs = ['看板视图', '表格视图'].map((label) => ({
@@ -286,9 +290,7 @@ function fakeMultiPaneCaptureDocument(panes, initialView = '看板视图') {
     defaultView: {
       innerWidth: 1200,
       innerHeight: 900,
-      getComputedStyle() {
-        return { overflowY: 'visible' };
-      },
+      getComputedStyle,
       requestAnimationFrame(callback) {
         callback();
       }
@@ -631,6 +633,54 @@ test('结构化采集使用多窗格布局并恢复原视图', async () => {
   ]);
   assert.deepEqual(doc.clicks, ['表格视图', '看板视图']);
   assert.equal(doc.activeView, '看板视图');
+});
+
+test('结构化采集遍历横向分段并恢复横向滚动位置', async () => {
+  const pane = fakePane({
+    left: 0,
+    top: 0,
+    width: 280,
+    rows: [
+      fakeLayoutRow(0, [
+        fakeLayoutCell('事项', [0, 0, 280], { role: 'columnheader' })
+      ], { header: true }),
+      fakeLayoutRow(10, [fakeLayoutCell('事项 A', [0, 10, 280])], {
+        rowIndex: 0
+      })
+    ]
+  });
+  const horizontalScroller = {
+    scrollLeft: 150,
+    scrollTop: 0,
+    scrollWidth: 1000,
+    clientWidth: 400,
+    scrollHeight: 300,
+    clientHeight: 300,
+    horizontal: true,
+    parentElement: null,
+    querySelectorAll() {
+      return [];
+    }
+  };
+  pane.parentElement = horizontalScroller;
+  const doc = fakeMultiPaneCaptureDocument(
+    [pane],
+    '表格视图',
+    (element) =>
+      element?.horizontal
+        ? { overflowY: 'visible', overflowX: 'auto' }
+        : { overflowY: 'visible', overflowX: 'visible' }
+  );
+
+  const result = await captureStructuredTable({
+    doc,
+    locationHref: doc.location.href,
+    sleep: async () => {},
+    now: () => 0
+  });
+
+  assert.equal(result.records.length, 1);
+  assert.equal(horizontalScroller.scrollLeft, 150);
 });
 
 test('表头为空时拒绝返回不可验证的数据', async () => {
