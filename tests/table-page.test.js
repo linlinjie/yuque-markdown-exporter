@@ -117,12 +117,12 @@ function fakeRect(left, top, width, height = 20) {
   };
 }
 
-function fakeLayoutCell(text, rect, { role = 'cell' } = {}) {
+function fakeLayoutCell(text, rect, { role = 'cell', children = [] } = {}) {
   return {
     tagName: role === 'columnheader' ? 'TH' : 'TD',
     innerText: text,
     textContent: text,
-    children: [],
+    children,
     getAttribute(name) {
       return name === 'role' ? role : null;
     },
@@ -817,6 +817,66 @@ test('按字段横向区间选择行带中的单元格', () => {
     cellValueForColumn(rowBand, { left: 300, right: 580 }),
     cell
   );
+});
+
+test('外层单元格包含横向字段容器时按子字段拆分', () => {
+  const headerCells = [
+    fakeLayoutCell('事项', [0, 0, 280], { role: 'columnheader' }),
+    fakeLayoutCell('状态', [280, 0, 140], { role: 'columnheader' }),
+    fakeLayoutCell('标签', [420, 0, 160], { role: 'columnheader' })
+  ];
+  const dataCells = [
+    fakeLayoutCell('事项 A', [0, 10, 280]),
+    fakeLayoutCell('进行中', [280, 10, 140]),
+    fakeLayoutCell('考勤', [420, 10, 160])
+  ];
+  const layout = discoverTableLayout(
+    fakeGridDocument([
+      fakePane({
+        left: 0,
+        top: 0,
+        width: 580,
+        rows: [
+          fakeLayoutRow(
+            0,
+            [
+              fakeLayoutCell('', [0, 0, 580], {
+                role: 'button',
+                children: headerCells
+              })
+            ],
+            { header: true }
+          ),
+          fakeLayoutRow(
+            10,
+            [
+              fakeLayoutCell('', [0, 10, 580], {
+                role: 'button',
+                children: dataCells
+              })
+            ],
+            { rowIndex: 0 }
+          )
+        ]
+      })
+    ])
+  );
+
+  assert.deepEqual(layout.columns.map(({ name }) => name), [
+    '事项',
+    '状态',
+    '标签'
+  ]);
+  assert.deepEqual(sampleLayoutRecords(layout, layout.columns), [
+    {
+      key: 'row-0',
+      values: {
+        'column-0': '事项 A',
+        'column-1': '进行中',
+        'column-2': '考勤'
+      }
+    }
+  ]);
 });
 
 test('固定列和独立字段窗格按视觉行合并完整记录', () => {
