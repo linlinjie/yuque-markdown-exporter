@@ -683,6 +683,38 @@ test('结构化采集遍历横向分段并恢复横向滚动位置', async () =>
   assert.equal(horizontalScroller.scrollLeft, 150);
 });
 
+test('字段表头被折叠成一列时拒绝生成错位文件', async () => {
+  const pane = fakePane({
+    left: 0,
+    top: 0,
+    width: 400,
+    rows: [
+      fakeLayoutRow(0, [
+        fakeLayoutCell('事项\n状态\n负责人', [0, 0, 400], {
+          role: 'columnheader'
+        })
+      ], { header: true }),
+      fakeLayoutRow(10, [fakeLayoutCell('事项 A', [0, 10, 400])], {
+        rowIndex: 0
+      })
+    ]
+  });
+  const doc = fakeMultiPaneCaptureDocument([pane], '表格视图');
+
+  await assert.rejects(
+    captureStructuredTable({
+      doc,
+      locationHref: doc.location.href,
+      sleep: async () => {},
+      now: () => 0
+    }),
+    (error) =>
+      error.code === 'INCOMPLETE_COLUMNS' &&
+      error.message === '未能完整识别表格字段，请刷新页面后重试' &&
+      typeof error.details?.diagnostic === 'string'
+  );
+});
+
 test('表头为空时拒绝返回不可验证的数据', async () => {
   const doc = fakeCaptureDocument(fakeTable([]));
 

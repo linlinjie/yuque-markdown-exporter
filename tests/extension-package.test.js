@@ -14,7 +14,7 @@ test('Manifest 声明 v2 最小固定权限和按需图片权限', async () => {
   const manifest = JSON.parse(await readProjectFile('manifest.json'));
 
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '2.0.0');
+  assert.equal(manifest.version, '2.0.1');
   assert.equal(manifest.action.default_popup, 'popup/popup.html');
   assert.deepEqual([...manifest.permissions].sort(), [
     'activeTab',
