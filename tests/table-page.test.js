@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   captureStructuredTable,
+  cellValueForColumn,
+  clusterRows,
+  discoverTableLayout,
   extractRenderedRecords,
   extractTableColumns,
   inspectStructuredPage,
@@ -98,6 +101,90 @@ function fakeTable(rows) {
   return {
     querySelectorAll(selector) {
       return selector === '[role="row"], tr' ? rows : [];
+    }
+  };
+}
+
+function fakeRect(left, top, width, height = 20) {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height
+  };
+}
+
+function fakeLayoutCell(text, rect, { role = 'cell' } = {}) {
+  return {
+    tagName: role === 'columnheader' ? 'TH' : 'TD',
+    innerText: text,
+    textContent: text,
+    children: [],
+    getAttribute(name) {
+      return name === 'role' ? role : null;
+    },
+    getBoundingClientRect() {
+      return fakeRect(...rect);
+    },
+    querySelectorAll() {
+      return [];
+    }
+  };
+}
+
+function fakeLayoutRow(top, cells, { header = false } = {}) {
+  const row = {
+    tagName: 'TR',
+    children: cells,
+    getAttribute(name) {
+      return name === 'role' ? 'row' : null;
+    },
+    getBoundingClientRect() {
+      const rects = cells.map((cell) => cell.getBoundingClientRect());
+      const left = Math.min(...rects.map((rect) => rect.left));
+      const right = Math.max(...rects.map((rect) => rect.right));
+      const bottom = Math.max(...rects.map((rect) => rect.bottom));
+      return fakeRect(left, top, right - left, bottom - top);
+    },
+    querySelectorAll(selector) {
+      if (
+        selector === '[role="gridcell"], [role="cell"], td, th' ||
+        selector === '[role="columnheader"], th'
+      ) {
+        return cells;
+      }
+      return [];
+    },
+    isHeader: header
+  };
+  return row;
+}
+
+function fakePane({ left, top, width, rows }) {
+  return {
+    tagName: 'TABLE',
+    getBoundingClientRect() {
+      return fakeRect(left, top, width, 300);
+    },
+    querySelectorAll(selector) {
+      return selector === '[role="row"], tr' ? rows : [];
+    }
+  };
+}
+
+function fakeGridDocument(panes) {
+  return {
+    defaultView: { innerWidth: 1200, innerHeight: 900 },
+    querySelectorAll(selector) {
+      if (selector === 'table, [role="grid"]') {
+        return panes;
+      }
+      if (selector === 'table') {
+        return panes;
+      }
+      return [];
     }
   };
 }
@@ -439,5 +526,102 @@ test('无记录时错误正文简短且诊断独立传递', async () => {
       error.message === '未读取到可导出的表格记录' &&
       typeof error.details?.diagnostic === 'string' &&
       error.details.diagnostic.includes('rows=2')
+  );
+});
+
+test('独立窗格中同一纵向位置的行合并为一个行带', () => {
+  const layout = discoverTableLayout(
+    fakeGridDocument([
+      fakePane({
+        left: 0,
+        top: 0,
+        width: 300,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('事项', [0, 0, 300], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(10, [fakeLayoutCell('事项 A', [0, 10, 300])])
+        ]
+      }),
+      fakePane({
+        left: 300,
+        top: 0,
+        width: 280,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('状态', [300, 0, 280], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(11, [fakeLayoutCell('进行中', [300, 11, 280])])
+        ]
+      })
+    ])
+  );
+
+  assert.equal(layout.rows.length, 1);
+  assert.equal(layout.rows[0].sources.length, 2);
+  assert.deepEqual(layout.columns.map(({ name }) => name), ['事项', '状态']);
+});
+
+test('行带允许两个像素的窗格偏差但拒绝跨行合并', () => {
+  assert.equal(
+    clusterRows([
+      { top: 10, bottom: 40, source: {} },
+      { top: 12, bottom: 42, source: {} }
+    ], 3).length,
+    1
+  );
+  assert.equal(
+    clusterRows([
+      { top: 10, bottom: 30, source: {} },
+      { top: 34, bottom: 54, source: {} }
+    ], 3).length,
+    2
+  );
+});
+
+test('只出现在单个窗格的分组行不会被当作记录', () => {
+  const layout = discoverTableLayout(
+    fakeGridDocument([
+      fakePane({
+        left: 0,
+        top: 0,
+        width: 300,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('事项', [0, 0, 300], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(10, [fakeLayoutCell('人事合同', [0, 10, 300])]),
+          fakeLayoutRow(30, [fakeLayoutCell('事项 A', [0, 30, 300])])
+        ]
+      }),
+      fakePane({
+        left: 300,
+        top: 0,
+        width: 280,
+        rows: [
+          fakeLayoutRow(0, [
+            fakeLayoutCell('状态', [300, 0, 280], { role: 'columnheader' })
+          ], { header: true }),
+          fakeLayoutRow(31, [fakeLayoutCell('进行中', [300, 31, 280])])
+        ]
+      })
+    ])
+  );
+
+  assert.equal(layout.rows.length, 1);
+  assert.equal(layout.rows[0].sources.length, 2);
+});
+
+test('按字段横向区间选择行带中的单元格', () => {
+  const cell = fakeLayoutCell('进行中', [300, 11, 280]);
+  const rowBand = {
+    top: 10,
+    bottom: 40,
+    sources: [{ top: 11, bottom: 31, cells: [cell] }]
+  };
+
+  assert.equal(
+    cellValueForColumn(rowBand, { left: 300, right: 580 }),
+    cell
   );
 });
