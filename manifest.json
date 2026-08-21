@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "语雀 Markdown 导出器",
-  "version": "2.1.3",
+  "version": "2.1.5",
   "description": "查看、复制和导出当前语雀文档、表格或数据表，支持 Markdown、CSV 和图片本地化。",
   "permissions": [
     "activeTab",

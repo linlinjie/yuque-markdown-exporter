@@ -392,8 +392,8 @@ test('通过页面表格容器识别语雀表格文档', () => {
       if (selector === '[role="tab"]') {
         return [];
       }
-      if (selector.includes('lakesheet') || selector.includes('lake-sheet')) {
-        return [{ className: 'lake-sheet-container' }];
+      if (selector.includes('lake-sheet-canvas')) {
+        return [{ className: 'lake-sheet-canvas-container' }];
       }
       return [];
     }
@@ -401,6 +401,94 @@ test('通过页面表格容器识别语雀表格文档', () => {
 
   assert.equal(inspectStructuredPage(doc).kind, 'sheet');
   assert.equal(inspectStructuredPage(doc).structured, true);
+});
+
+test('普通 lake 文档即使页面 chrome 带 sheet 字样也不当成表格', () => {
+  const doc = {
+    defaultView: {
+      appData: {
+        book: { id: 1 },
+        doc: {
+          type: 'Doc',
+          format: 'lake',
+          title: '用工业务周报2026-08',
+          slug: 'fay9atti6i5ag0gd'
+        }
+      }
+    },
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return [];
+      }
+      if (selector.includes('sheet')) {
+        return [{ className: 'doc-sheet', getAttribute: () => 'sheet' }];
+      }
+      if (selector === 'table') {
+        return [{ className: 'ne-table' }];
+      }
+      return [];
+    }
+  };
+
+  assert.deepEqual(inspectStructuredPage(doc), {
+    structured: false,
+    kind: null,
+    activeView: null,
+    hasTableView: false,
+    isSheet: false
+  });
+});
+
+test('页面级表格视图即使 appData 写成 Doc 也识别为数据表', () => {
+  const doc = {
+    defaultView: {
+      appData: {
+        book: { id: 1 },
+        doc: {
+          type: 'Doc',
+          format: 'lake',
+          title: '工程服务清单',
+          slug: 'la2270eunh28wpg6'
+        }
+      }
+    },
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return [
+          fakeTab('看板视图', false),
+          fakeTab('表格视图', true),
+          fakeTab('表单', false)
+        ];
+      }
+      return [];
+    }
+  };
+
+  assert.deepEqual(inspectStructuredPage(doc), {
+    structured: true,
+    kind: 'table',
+    activeView: '表格视图',
+    hasTableView: true,
+    isSheet: false
+  });
+});
+
+test('没有 appData 时不会把 data-testid 含 sheet 的页面当成表格', () => {
+  const doc = {
+    defaultView: {},
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return [];
+      }
+      if (selector.includes('data-testid')) {
+        return [{ className: 'ant-sheet', getAttribute: () => 'sheet' }];
+      }
+      return [];
+    }
+  };
+
+  assert.equal(inspectStructuredPage(doc).structured, false);
+  assert.equal(inspectStructuredPage(doc).kind, null);
 });
 
 test('从当前页面接口读取表格文档内容', async () => {
