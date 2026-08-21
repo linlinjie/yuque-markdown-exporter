@@ -10,7 +10,10 @@ test('企业语雀文档转换为 plain Markdown 地址', () => {
       supported: true,
       sourceUrl: 'https://team.yuque.com/org/repo/doc',
       markdownUrl:
-        'https://team.yuque.com/org/repo/doc/markdown?plain=true&linebreak=false&anchor=false'
+        'https://team.yuque.com/org/repo/doc/markdown?plain=true&linebreak=false&anchor=false',
+      namespace: 'org/repo',
+      slug: 'doc',
+      docApiUrl: 'https://team.yuque.com/api/v2/repos/org/repo/docs/doc'
     }
   );
 });
@@ -24,7 +27,11 @@ test('已有 Markdown 后缀不会重复追加', () => {
       supported: true,
       sourceUrl: 'https://zhyk.yuque.com/oa6mm8/layc61/fgbk8xpmd41u7gkw',
       markdownUrl:
-        'https://zhyk.yuque.com/oa6mm8/layc61/fgbk8xpmd41u7gkw/markdown?plain=true&linebreak=false&anchor=false'
+        'https://zhyk.yuque.com/oa6mm8/layc61/fgbk8xpmd41u7gkw/markdown?plain=true&linebreak=false&anchor=false',
+      namespace: 'oa6mm8/layc61',
+      slug: 'fgbk8xpmd41u7gkw',
+      docApiUrl:
+        'https://zhyk.yuque.com/api/v2/repos/oa6mm8/layc61/docs/fgbk8xpmd41u7gkw'
     }
   );
 });

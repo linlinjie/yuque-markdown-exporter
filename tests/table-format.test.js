@@ -100,3 +100,29 @@ test('CSV 链接同时保留显示文本和地址', () => {
 
   assert.equal(csv, '\uFEFF文档\r\n方案 <https://example.test/doc>\r\n');
 });
+
+test('自定义导出范围和多个工作表都会写入 Markdown', () => {
+  const markdown = tableToMarkdown({
+    title: '需求跟踪表',
+    sourceUrl: 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1',
+    exportScope: '语雀表格（完整工作表）',
+    sheets: [
+      {
+        name: '需求',
+        columns: [{ id: 'column-0', name: '事项' }],
+        records: [{ key: 'row-0', values: { 'column-0': 'A' } }]
+      },
+      {
+        name: '进度',
+        columns: [{ id: 'column-0', name: '状态' }],
+        records: [{ key: 'row-0', values: { 'column-0': '进行中' } }]
+      }
+    ]
+  });
+
+  assert.match(markdown, /语雀表格（完整工作表）/);
+  assert.match(markdown, /## 需求/);
+  assert.match(markdown, /## 进度/);
+  assert.match(markdown, /\| A \|/);
+  assert.match(markdown, /\| 进行中 \|/);
+});

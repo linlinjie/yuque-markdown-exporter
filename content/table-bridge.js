@@ -6,7 +6,8 @@
 
   const supportedMessages = new Set([
     'YUQUE_TABLE_INSPECT',
-    'YUQUE_TABLE_CAPTURE'
+    'YUQUE_TABLE_CAPTURE',
+    'YUQUE_FETCH_DOC'
   ]);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -20,16 +21,18 @@
         const value =
           message.type === 'YUQUE_TABLE_INSPECT'
             ? page.inspectStructuredPage()
-            : await page.captureStructuredTable({
-                onProgress(progressMessage) {
-                  void chrome.runtime
-                    .sendMessage({
-                      type: 'YUQUE_TABLE_PROGRESS',
-                      message: progressMessage
-                    })
-                    .catch(() => {});
-                }
-              });
+            : message.type === 'YUQUE_FETCH_DOC'
+              ? await page.fetchPageDocument()
+              : await page.captureStructuredTable({
+                  onProgress(progressMessage) {
+                    void chrome.runtime
+                      .sendMessage({
+                        type: 'YUQUE_TABLE_PROGRESS',
+                        message: progressMessage
+                      })
+                      .catch(() => {});
+                  }
+                });
         sendResponse({ ok: true, value });
       } catch (error) {
         sendResponse({

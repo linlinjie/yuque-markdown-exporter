@@ -5,6 +5,7 @@ import {
   collectImageOrigins,
   ExportError,
   fetchMarkdownText,
+  fetchYuqueDocJson,
   localizeImages
 } from '../lib/exporter.js';
 
@@ -176,4 +177,31 @@ test('图片输出顺序不受网络完成顺序影响', async () => {
       ['images/image-002.gif', [2]]
     ]
   );
+});
+
+test('读取语雀文档 JSON 并解开 data 包装', async () => {
+  let received;
+  const fetchImpl = async (url, options) => {
+    received = { url, options };
+    return response(
+      JSON.stringify({
+        data: {
+          type: 'Sheet',
+          format: 'lakesheet',
+          title: '需求跟踪表',
+          body_sheet: '{}'
+        }
+      }),
+      { headers: { 'content-type': 'application/json' } }
+    );
+  };
+
+  const doc = await fetchYuqueDocJson(
+    fetchImpl,
+    'https://zhyk.yuque.com/api/v2/repos/oa6mm8/layc61/docs/ce8pdoqneh90ybu1'
+  );
+
+  assert.equal(doc.type, 'Sheet');
+  assert.equal(received.options.credentials, 'include');
+  assert.equal(received.options.headers.Accept, 'application/json');
 });

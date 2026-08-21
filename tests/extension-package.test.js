@@ -14,7 +14,7 @@ test('Manifest 声明 v2 最小固定权限和按需图片权限', async () => {
   const manifest = JSON.parse(await readProjectFile('manifest.json'));
 
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '2.0.1');
+  assert.equal(manifest.version, '2.1.2');
   assert.equal(manifest.action.default_popup, 'popup/popup.html');
   assert.deepEqual([...manifest.permissions].sort(), [
     'activeTab',
@@ -37,7 +37,12 @@ test('Manifest 声明 v2 最小固定权限和按需图片权限', async () => {
   });
   assert.deepEqual(manifest.web_accessible_resources, [
     {
-      resources: ['lib/table-capture.js', 'lib/table-page.js'],
+      resources: [
+        'lib/table-capture.js',
+        'lib/table-page.js',
+        'lib/yuque-doc.js',
+        'lib/sheet-parse.js'
+      ],
       matches: [
         'http://yuque.com/*',
         'http://*.yuque.com/*',

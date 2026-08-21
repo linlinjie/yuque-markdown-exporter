@@ -10,12 +10,20 @@
     <main>
       <header>
         <span class="logo" aria-hidden="true">M↓</span>
-        <div>
+        <div class="header-text">
           <h1 id="preview-title">Markdown 预览</h1>
           <p>语雀 Markdown 导出器 · 本地生成</p>
         </div>
+        <div id="preview-actions" class="actions" hidden>
+          <button id="copy-button" class="button button-secondary" type="button">
+            复制 Markdown
+          </button>
+          <button id="export-button" class="button button-primary" type="button">
+            导出 Markdown
+          </button>
+        </div>
       </header>
-      <p id="preview-status" class="status" role="status" hidden></p>
+      <p id="preview-status" class="status" role="status" aria-live="polite" hidden></p>
       <pre id="preview-content"></pre>
     </main>
     <script type="module" src="./viewer.js"></script>

@@ -117,6 +117,10 @@ const browser = {
     return sendTableMessage(tabId, 'YUQUE_TABLE_CAPTURE');
   },
 
+  fetchPageDocument(tabId) {
+    return sendTableMessage(tabId, 'YUQUE_FETCH_DOC');
+  },
+
   openTab(url) {
     return chrome.tabs.create({ url });
   },

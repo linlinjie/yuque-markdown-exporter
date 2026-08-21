@@ -18,8 +18,58 @@ main {
 header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.header-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.button {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(37, 184, 100, 0.55);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.button-secondary {
+  border-color: #d8e1dc;
+  color: #31523e;
+  background: #fff;
+}
+
+.button-primary {
+  color: #fff;
+  background: #20a85a;
 }
 
 header h1,
@@ -57,8 +107,21 @@ pre {
 
 .status {
   padding: 14px;
+}
+
+.status.error {
   color: #9f2525;
   background: #feeeee;
+}
+
+.status.success {
+  color: #17643b;
+  background: #e8f8ef;
+}
+
+.status.info {
+  color: #36536f;
+  background: #eaf4ff;
 }
 
 pre {

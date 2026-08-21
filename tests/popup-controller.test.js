@@ -43,7 +43,8 @@ function createHarness({
       }
     ]
   },
-  captureError
+  captureError,
+  pageDocument
 } = {}) {
   const state = {
     page: undefined,
@@ -56,6 +57,7 @@ function createHarness({
     permissionRequests: [],
     inspectionCalls: [],
     captureCalls: [],
+    fetchDocCalls: [],
     previews: [],
     captureProgress: []
   };
@@ -98,6 +100,10 @@ function createHarness({
         throw captureError;
       }
       return capturedTable;
+    },
+    async fetchPageDocument(tabId) {
+      state.fetchDocCalls.push(tabId);
+      return pageDocument;
     },
     async openGeneratedMarkdown(preview) {
       state.previews.push(preview);
@@ -240,6 +246,130 @@ test('结构化页面下载 Markdown 文件', async () => {
   assert.match(await state.downloads[0].blob.text(), /\| 事项 A \| 进行中 \|/);
 });
 
+test('语雀表格文档用接口数据导出且不采集 DOM', async () => {
+  const { controller, state } = createHarness({
+    tab: {
+      id: 42,
+      url: 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1',
+      title: '需求跟踪表'
+    },
+    inspections: [
+      {
+        structured: true,
+        kind: 'sheet',
+        activeView: null,
+        hasTableView: false,
+        isSheet: true
+      }
+    ],
+    pageDocument: {
+      type: 'Sheet',
+      format: 'lakesheet',
+      title: '需求跟踪表',
+      body_sheet: JSON.stringify({
+        data: [
+          {
+            name: 'Sheet1',
+            table: [
+              ['事项', '状态'],
+              ['事项 A', '进行中']
+            ]
+          }
+        ]
+      })
+    }
+  });
+
+  await controller.initialize();
+  await controller.copyMarkdown();
+
+  assert.equal(state.page.kind, 'table');
+  assert.deepEqual(state.captureCalls, []);
+  assert.deepEqual(state.fetchDocCalls, [42]);
+  assert.match(state.copied[0], /语雀表格（完整工作表）/);
+  assert.match(state.copied[0], /\| 事项 A \| 进行中 \|/);
+});
+
+test('Markdown 404 后用表格接口数据导出', async () => {
+  const { controller, state } = createHarness({
+    tab: {
+      id: 42,
+      url: 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1',
+      title: '需求跟踪表'
+    },
+    fetchImpl: async () => markdownResponse('Not Found', 404),
+    inspections: [
+      {
+        structured: false,
+        kind: null,
+        activeView: null,
+        hasTableView: false,
+        isSheet: false
+      }
+    ],
+    pageDocument: {
+      type: 'Sheet',
+      format: 'lakesheet',
+      title: '需求跟踪表',
+      body_sheet: JSON.stringify({
+        data: [
+          {
+            name: 'Sheet1',
+            table: [
+              ['事项', '状态'],
+              ['事项 A', '进行中']
+            ]
+          }
+        ]
+      })
+    }
+  });
+
+  await controller.initialize();
+  assert.equal(state.page.kind, 'document');
+
+  await controller.copyMarkdown();
+
+  assert.equal(state.page.kind, 'table');
+  assert.deepEqual(state.captureCalls, []);
+  assert.match(state.copied[0], /\| 事项 A \| 进行中 \|/);
+});
+
+test('数据表视图仍优先采集当前页面而不是接口底表', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        kind: 'table',
+        activeView: '表格视图',
+        hasTableView: true,
+        isSheet: false
+      }
+    ],
+    pageDocument: {
+      type: 'Table',
+      format: 'laketable',
+      title: '底表',
+      body_table: JSON.stringify({
+        format: 'laketable',
+        type: 'Table',
+        sheet: [
+          {
+            columns: [{ id: 'c1', name: '底表字段', type: 'text' }],
+            records: [{ data: { c1: { value: '底表记录' } } }]
+          }
+        ]
+      })
+    }
+  });
+
+  await controller.initialize();
+  await controller.copyMarkdown();
+
+  assert.deepEqual(state.captureCalls, [42]);
+  assert.match(state.copied[0], /\| 事项 A \| 进行中 \|/);
+});
+
 test('结构化页面下载带 BOM 的 CSV 文件', async () => {
   const { controller, state } = createHarness({
     inspections: [
@@ -260,6 +390,29 @@ test('结构化页面下载带 BOM 的 CSV 文件', async () => {
     [...new Uint8Array(await state.downloads[0].blob.arrayBuffer()).slice(0, 3)],
     [0xef, 0xbb, 0xbf]
   );
+});
+
+test('表格文档没有接口数据且 DOM 采集失败时给出明确错误', async () => {
+  const { controller, state } = createHarness({
+    inspections: [
+      {
+        structured: true,
+        kind: 'sheet',
+        activeView: null,
+        hasTableView: false,
+        isSheet: true
+      }
+    ],
+    pageDocument: { type: 'Sheet', format: 'lakesheet' },
+    captureError: new Error('当前页面不是可导出的语雀表格/看板')
+  });
+
+  await controller.initialize();
+  await controller.startExport('markdown');
+
+  assert.deepEqual(state.downloads, []);
+  assert.equal(state.statuses.at(-1).kind, 'error');
+  assert.match(state.statuses.at(-1).message, /无法读取语雀表格数据/);
 });
 
 test('结构化页面采集失败时不生成文件', async () => {

@@ -5,13 +5,17 @@ import {
   captureStructuredTable,
   cellValueForColumn,
   clusterRows,
+  describeDocumentShape,
   discoverTableLayout,
+  extractLaketableColumns,
+  extractLaketableRecords,
   extractRenderedRecords,
   extractTableColumns,
   inspectStructuredPage,
   normalizeRenderedRow,
   sampleLayoutRecords
 } from '../lib/table-page.js';
+import { fetchPageDocument } from '../lib/yuque-doc.js';
 
 function fakeTab(textContent, selected = false) {
   return {
@@ -28,8 +32,10 @@ function fakeTab(textContent, selected = false) {
 function fakeDocument(tabs) {
   return {
     querySelectorAll(selector) {
-      assert.equal(selector, '[role="tab"]');
-      return tabs;
+      if (selector === '[role="tab"]') {
+        return tabs;
+      }
+      return [];
     }
   };
 }
@@ -322,16 +328,20 @@ test('通过页面视图标签识别结构化表格', () => {
 
   assert.deepEqual(inspectStructuredPage(doc), {
     structured: true,
+    kind: 'table',
     activeView: '表格视图',
-    hasTableView: true
+    hasTableView: true,
+    isSheet: false
   });
 });
 
 test('普通语雀文档不被识别为结构化页面', () => {
   assert.deepEqual(inspectStructuredPage(fakeDocument([])), {
     structured: false,
+    kind: null,
     activeView: null,
-    hasTableView: false
+    hasTableView: false,
+    isSheet: false
   });
 });
 
@@ -340,10 +350,95 @@ test('缺少表格视图时不进入当前版本的结构化导出', () => {
     inspectStructuredPage(fakeDocument([fakeTab('看板视图', true)])),
     {
       structured: false,
+      kind: null,
       activeView: '看板视图',
-      hasTableView: false
+      hasTableView: false,
+      isSheet: false
     }
   );
+});
+
+test('通过 appData 识别语雀表格文档', () => {
+  const doc = {
+    defaultView: {
+      appData: {
+        book: { id: 88 },
+        doc: {
+          type: 'Sheet',
+          format: 'lakesheet',
+          slug: 'ce8pdoqneh90ybu1',
+          title: '需求跟踪表'
+        }
+      }
+    },
+    querySelectorAll(selector) {
+      return selector === '[role="tab"]' ? [] : [];
+    }
+  };
+
+  assert.deepEqual(inspectStructuredPage(doc), {
+    structured: true,
+    kind: 'sheet',
+    activeView: null,
+    hasTableView: false,
+    isSheet: true
+  });
+});
+
+test('通过页面表格容器识别语雀表格文档', () => {
+  const doc = {
+    defaultView: {},
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return [];
+      }
+      if (selector.includes('lakesheet') || selector.includes('lake-sheet')) {
+        return [{ className: 'lake-sheet-container' }];
+      }
+      return [];
+    }
+  };
+
+  assert.equal(inspectStructuredPage(doc).kind, 'sheet');
+  assert.equal(inspectStructuredPage(doc).structured, true);
+});
+
+test('从当前页面接口读取表格文档内容', async () => {
+  const calls = [];
+  const doc = {
+    defaultView: {
+      appData: {
+        book: { id: 88 },
+        doc: { type: 'Sheet', format: 'lakesheet', slug: 'ce8pdoqneh90ybu1' }
+      }
+    },
+    location: {
+      href: 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1'
+    }
+  };
+
+  const payload = await fetchPageDocument({
+    doc,
+    locationHref: doc.location.href,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return new Response(
+        JSON.stringify({
+          data: {
+            type: 'Sheet',
+            format: 'lakesheet',
+            title: '需求跟踪表',
+            body_sheet: '{"data":[{"name":"Sheet1","table":[["事项"],["A"]]}]}'
+          }
+        }),
+        { headers: { 'content-type': 'application/json' } }
+      );
+    }
+  });
+
+  assert.match(calls[0].url, /\/api\/docs\/ce8pdoqneh90ybu1\?book_id=88/);
+  assert.equal(payload.type, 'Sheet');
+  assert.match(payload.body_sheet, /事项/);
 });
 
 test('没有稳定行号的分组和统计行不会被当作记录', () => {
@@ -1042,4 +1137,205 @@ test('重复主字段没有稳定标识时安全失败', () => {
     ]),
     (error) => error.code === 'UNSTABLE_RECORD_ID'
   );
+});
+
+function fakeLaketableHeader(name) {
+  return {
+    className: 'lakex-viewer-grid-header-column',
+    innerText: name,
+    textContent: name,
+    querySelector(selector) {
+      if (selector === '.lakex-viewer-grid-header-column-name') {
+        return { innerText: name, textContent: name };
+      }
+      return null;
+    }
+  };
+}
+
+function fakeLaketableRow(index, cells) {
+  return {
+    className: 'lakex-viewer-grid-list-row',
+    querySelector(selector) {
+      if (selector === '.lakex-viewer-grid-row-index') {
+        return { innerText: String(index), textContent: String(index) };
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === '.lakex-viewer-grid-cell') {
+        return cells;
+      }
+      return [];
+    }
+  };
+}
+
+function fakeLaketableDocument({
+  columns,
+  records,
+  initialView = '表格视图',
+  title = '202608员工服务早会看板'
+}) {
+  let activeView = initialView;
+  const clicks = [];
+  const tabs = ['看板视图', '表格视图'].map((label) => ({
+    textContent: label,
+    getAttribute(name) {
+      return name === 'aria-selected' && activeView === label ? 'true' : null;
+    },
+    matches(selector) {
+      return selector === '[aria-selected="true"]' && activeView === label;
+    },
+    click() {
+      activeView = label;
+      clicks.push(label);
+    }
+  }));
+  const headers = columns.map((name) => fakeLaketableHeader(name));
+  const rows = records.map((record) =>
+    fakeLaketableRow(
+      record.index,
+      columns.map((name) =>
+        fakeCell(record.values[name] ?? '', record.cellOptions?.[name] ?? {})
+      )
+    )
+  );
+
+  return {
+    title,
+    location: {
+      href: 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1'
+    },
+    defaultView: {
+      getComputedStyle() {
+        return { overflowY: 'visible', overflowX: 'visible' };
+      },
+      requestAnimationFrame(callback) {
+        callback();
+      }
+    },
+    clicks,
+    get activeView() {
+      return activeView;
+    },
+    querySelector(selector) {
+      if (
+        selector === '.lakex-table-view-container, .lakex-viewer-grid' ||
+        selector === '.lakex-viewer-grid'
+      ) {
+        return { className: 'lakex-viewer-grid' };
+      }
+      if (selector === '.lakex-viewer-grid table' || selector === 'table') {
+        return { querySelectorAll() { return []; } };
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === '[role="tab"]') {
+        return tabs;
+      }
+      if (selector === '.lakex-viewer-grid-header-column') {
+        return headers;
+      }
+      if (selector === '.lakex-viewer-grid-list-row') {
+        return rows;
+      }
+      if (selector === '.lakex-viewer-grid-cell') {
+        return rows.flatMap((row) =>
+          row.querySelectorAll('.lakex-viewer-grid-cell')
+        );
+      }
+      if (selector === 'table' || selector === 'table, [role="grid"]') {
+        return [];
+      }
+      if (selector === 'button') {
+        return [];
+      }
+      return [];
+    }
+  };
+}
+
+test('语雀数据表从 lakex 字段单元格读取表头和记录', () => {
+  const doc = fakeLaketableDocument({
+    columns: ['待办事项', '状态', '标签'],
+    records: [
+      {
+        index: 1,
+        values: { 待办事项: '花名册导出', 状态: '已完成', 标签: '人事合同 考勤' },
+        cellOptions: { 标签: { badges: ['人事合同', '考勤'] } }
+      },
+      {
+        index: 45,
+        values: { 待办事项: '', 状态: '', 标签: '' }
+      }
+    ]
+  });
+  const columns = extractLaketableColumns(doc);
+
+  assert.deepEqual(
+    columns.map(({ name }) => name),
+    ['待办事项', '状态', '标签']
+  );
+  assert.deepEqual(extractLaketableRecords(doc, columns), [
+    {
+      key: 'row-1',
+      values: {
+        'column-0': '花名册导出',
+        'column-1': '已完成',
+        'column-2': ['人事合同', '考勤']
+      }
+    },
+    {
+      key: 'row-45',
+      values: {
+        'column-0': '',
+        'column-1': '',
+        'column-2': ''
+      }
+    }
+  ]);
+  assert.match(describeDocumentShape(doc), /lakex=3c\/2r\/6cells/);
+});
+
+test('语雀数据表即使每行只有一个 td 也能采集完整字段', async () => {
+  const doc = fakeLaketableDocument({
+    columns: ['待办事项', '状态', '研发'],
+    records: [
+      {
+        index: 1,
+        values: {
+          待办事项: '【101hr】花名册导出',
+          状态: '已完成',
+          研发: '魏文彤'
+        }
+      },
+      {
+        index: 2,
+        values: {
+          待办事项: '批量复制考勤组地址',
+          状态: '已完成',
+          研发: '魏文彤'
+        }
+      }
+    ]
+  });
+
+  const result = await captureStructuredTable({
+    doc,
+    locationHref: doc.location.href,
+    sleep: async () => {},
+    now: () => 0
+  });
+
+  assert.deepEqual(result.columns.map(({ name }) => name), [
+    '待办事项',
+    '状态',
+    '研发'
+  ]);
+  assert.equal(result.records.length, 2);
+  assert.equal(result.records[0].values['column-0'], '【101hr】花名册导出');
+  assert.equal(result.records[1].key, 'row-2');
+  assert.equal(result.sourceUrl, 'https://zhyk.yuque.com/oa6mm8/layc61/ce8pdoqneh90ybu1');
 });
